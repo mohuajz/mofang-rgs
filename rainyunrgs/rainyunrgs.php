@@ -517,6 +517,25 @@ function rainyunrgs_CreateAccount($params)
         $duration = 1;
     }
 
+	$filtered = array_filter($params['configoptions'], function ($key) {
+		return strpos($key, 'with_eip_num_') === 0 || $key === 'with_eip_num';
+	}, ARRAY_FILTER_USE_KEY);
+	$eip = '0';
+	$eip_flag = '';
+	if (isset($filtered['with_eip_num']) && $filtered['with_eip_num'] != 0) {
+		$eip_flag = '';
+		$eip = $params['configoptions']['with_eip_num'];
+	} elseif (!empty($filtered)) {
+		foreach ($filtered as $k => $v) {
+			if ($v != 0) {
+				$eip_flag = str_replace('with_eip_num_', '', $k);
+				$eip = $v;
+				break;
+			}
+		}
+	}
+	$eip_type = $eip_flag === 'ipv6' ? 'IPv6' : '';
+
     $header = ["Content-Type: application/json; charset=utf-8", "x-api-key: " . $params["server_password"]];
     $url = $params["server_host"] . "/product/rgs/";
 
@@ -536,9 +555,9 @@ function rainyunrgs_CreateAccount($params)
 		"panel_user"=>null,
 		"plan_id"=>(int)$params["configoptions"]["plan_id"]?:0,
 		"subtype"=>$params["configoptions"]["subtype"],
-		"with_eip_num"=>(int)$params["configoptions"]["with_eip_num"]?:0,
-		"with_eip_flags"=>"",
-		"with_eip_type"=>"",
+		"with_eip_num" => (int) $eip ?: 0,
+		"with_eip_flags" => $eip_flag,
+		"with_eip_type" => $eip_type,
 		"cpu_limit_mode"=>false,
 		"try"=>$try,
 		"node_uuid"=>"",
@@ -894,7 +913,7 @@ function rainyunrgs_FiveMinuteCron() {
 			$res = rainyunrgs_Curl($url, null, 30, "GET", $header)['data'];
 			foreach ($res as $product) {
 				if ($product['id'] == $pid) {
-					$availableStock = $product['available_stock'];
+					$availableStock = $product['is_selling'] ? $product['available_stock'] : 0;
 					$cpu = $product['cpu'];
 					$memory = $product['memory'];
 					$net_in = $product['net_in'];
